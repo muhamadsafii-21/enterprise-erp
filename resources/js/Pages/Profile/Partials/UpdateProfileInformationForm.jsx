@@ -12,16 +12,26 @@ export default function UpdateProfileInformation({
 }) {
     const user = usePage().props.auth.user;
 
-    const { data, setData, patch, errors, processing, recentlySuccessful } =
+    const { data, setData, post, errors, processing, recentlySuccessful } =
         useForm({
             name: user.name,
             email: user.email,
+            avatar: null, // Tambahan field untuk foto profil
         });
 
     const submit = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'));
+        // Karena kita mengirim file (avatar), form wajib menggunakan POST 
+        // dengan trik method spoofing _method: 'patch' agar cocok dengan route PATCH Laravel
+        post(route('profile.update'), {
+            forceFormData: true,
+            preserveScroll: true,
+            data: {
+                ...data,
+                _method: 'patch',
+            },
+        });
     };
 
     return (
@@ -32,11 +42,30 @@ export default function UpdateProfileInformation({
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-600">
-                    Update your account's profile information and email address.
+                    Update your account's profile information, email address, and profile picture.
                 </p>
             </header>
 
             <form onSubmit={submit} className="mt-6 space-y-6">
+               {/* Bagian Preview & Input Foto Profil */}
+<div className="flex items-center gap-4">
+    <img 
+        src={data.avatar ? URL.createObjectURL(data.avatar) : (user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=random')} 
+        alt="Profile Preview" 
+        className="w-16 h-16 rounded-full object-cover border border-gray-300 shadow-sm"
+    />
+    <div>
+        <InputLabel htmlFor="avatar" value="Profile Photo" />
+        <input
+            id="avatar"
+            type="file"
+            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+            onChange={(e) => setData('avatar', e.target.files[0])}
+        />
+        <InputError className="mt-2" message={errors.avatar} />
+    </div>
+</div>
+
                 <div>
                     <InputLabel htmlFor="name" value="Name" />
 

@@ -71,6 +71,12 @@ export default function Index({ auth, customers }) {
                                                     >
                                                         Hapus
                                                     </Link>
+                                                    <Link 
+    href={route('customers.show', customer.id)} 
+    className="text-indigo-600 hover:text-indigo-900 font-semibold text-sm bg-indigo-50 px-3 py-1.5 rounded-lg transition"
+>
+    Lihat Profil
+</Link>
                                                 </td>
                                             </tr>
                                         ))

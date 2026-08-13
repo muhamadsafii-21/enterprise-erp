@@ -26,16 +26,22 @@ class SalesInvoiceController extends Controller
     // 2. Method Create (Wajib Berdasarkan Sales Order)
     public function create($salesOrderId = null)
     {
-        // Jika diakses tanpa ID Sales Order, tolak dan kembalikan ke halaman Sales Orders
         if (!$salesOrderId) {
             return redirect()->route('sales-orders.index')
                 ->with('error', 'Faktur Penjualan harus dibuat melalui Sales Order yang tersedia.');
         }
 
-        // Ambil data Sales Order beserta customer dan produknya
+        // --- TAMBAHKAN CEK INI (Mencegah Faktur Double) ---
+        $existingInvoice = SalesInvoice::where('sales_order_id', $salesOrderId)->first();
+        if ($existingInvoice) {
+            return redirect()->route('sales-invoices.show', $existingInvoice->id)
+                ->with('error', 'Faktur untuk Sales Order ini sudah pernah dibuat sebelumnya!');
+        }
+        // -------------------------------------------------
+
         $salesOrder = SalesOrder::with(['customer', 'items.product'])->findOrFail($salesOrderId);
 
-        // Generate nomor invoice otomatis rapi berformat INV-SLS/YYYYMM/00X
+        // Generate nomor invoice otomatis...
         $latestInvoice = SalesInvoice::latest()->first();
         $nextNumber = $latestInvoice ? $latestInvoice->id + 1 : 1;
         $invoiceNumber = 'INV-SLS/' . date('Ym') . '/' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);

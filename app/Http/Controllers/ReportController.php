@@ -5,72 +5,44 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\PurchaseInvoice;
 use App\Models\SalesInvoice;
-use App\Models\SalesOrder;
-use App\Models\SalesInvoiceItem;
+use App\Models\StockMovement;
+use App\Models\Product;
+use App\Models\Expense;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Inertia\Inertia;
 
 class ReportController extends Controller
 {
-
-
-    // Menampilkan form untuk membuat Sales Invoice berdasarkan Sales Order
-    public function create($salesOrderId)
+    // 1. Laporan Kartu Stok (Stock Movements)
+    public function stockCard(Request $request)
     {
-        $salesOrder = SalesOrder::with('items.product')->findOrFail($salesOrderId);
+        $products = Product::select('id', 'name', 'sku', 'stock')->get();
+        $query = StockMovement::with('product');
 
-        return Inertia::render('SalesInvoices/Create', [
-            'salesOrder' => $salesOrder,
-        ]);
-    }
-
-    // Menyimpan data Sales Invoice ke database
-    public function store(Request $request)
-    {
-        $request->validate([
-            'sales_order_id' => 'required|exists:sales_orders,id',
-            'invoice_date' => 'required|date',
-            'due_date' => 'required|date',
-            'grand_total' => 'required|numeric',
-        ]);
-
-        // Buat nomor invoice otomatis (contoh: INV-SLS/YYYYMM/00X)
-        $invoiceNumber = 'INV-SLS/' . date('Ym') . '/' . str_pad(SalesInvoice::count() + 1, 3, '0', STR_PAD_LEFT);
-
-        $salesOrder = SalesOrder::with('items')->findOrFail($request->sales_order_id);
-
-        // 1. Simpan Header Invoice
-        $invoice = SalesInvoice::create([
-            'invoice_number' => $invoiceNumber,
-            'sales_order_id' => $salesOrder->id,
-            'customer_name' => $salesOrder->customer_name,
-            'invoice_date' => $request->invoice_date,
-            'due_date' => $request->due_date,
-            'grand_total' => $salesOrder->total_amount,
-            'paid_amount' => 0,
-            'status' => 'unpaid',
-        ]);
-
-        // 2. Simpan Item Invoice (disalin dari Sales Order Items)
-        foreach ($salesOrder->items as $item) {
-            SalesInvoiceItem::create([
-                'sales_invoice_id' => $invoice->id,
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'unit_price' => $item->unit_price,
-                'sub_total' => $item->sub_total,
-            ]);
+        if ($request->filled('product_id')) {
+            $query->where('product_id', $request->product_id);
         }
 
-        return redirect()->route('sales-invoices.index')->with('success', 'Faktur Penjualan berhasil dibuat!');
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('created_at', [$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
+        }
+
+        $movements = $query->latest()->paginate(15)->withQueryString();
+
+        return Inertia::render('Reports/StockCard', [
+            'movements' => $movements,
+            'products' => $products,
+            'filters' => $request->only(['product_id', 'start_date', 'end_date']),
+        ]);
     }
+
+    // 2. Laporan Utang Usaha (Accounts Payable)
     public function accountsPayable()
     {
-        // Ambil semua invoice pembelian yang belum lunas (status bukan 'paid')
         $invoices = PurchaseInvoice::with('supplier')
             ->where('status', '!=', 'paid')
             ->get()
             ->map(function ($invoice) {
-                // Hitung sisa kurang bayar
                 $remaining = $invoice->grand_total - $invoice->paid_amount;
                 return [
                     'id' => $invoice->id,
@@ -85,7 +57,6 @@ class ReportController extends Controller
                 ];
             });
 
-        // Hitung total keseluruhan utang yang belum dibayar
         $totalDebt = $invoices->sum('remaining_balance');
 
         return Inertia::render('Reports/AccountsPayable', [
@@ -93,29 +64,23 @@ class ReportController extends Controller
             'totalDebt' => $totalDebt,
         ]);
     }
-    // Sesuaikan dengan model penjualanmu jika ada
-    // use App\Models\Expense; // Jika ada tabel beban operasional
-
-
 
     public function profitAndLoss(Request $request)
     {
-        $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $endDate = $request->input('end_date', now()->endOfMonth()->toDateString());
+        // Gunakan filled() atau pengecekan eksplisit agar jika user memilih tanggal, itu yang dipakai.
+        // Jika tidak ada parameter dikirim, baru gunakan default awal/akhir bulan ini.
+        $startDate = $request->filled('start_date')
+            ? $request->input('start_date')
+            : now()->startOfMonth()->toDateString();
 
-        // 1. Total Pendapatan ditarik dari Sales Invoice
+        $endDate = $request->filled('end_date')
+            ? $request->input('end_date')
+            : now()->endOfMonth()->toDateString();
+
         $totalRevenue = SalesInvoice::whereBetween('invoice_date', [$startDate, $endDate])->sum('grand_total');
-
-        // 2. Harga Pokok Penjualan (HPP) ditarik dari Purchase Invoice
         $totalHpp = PurchaseInvoice::whereBetween('invoice_date', [$startDate, $endDate])->sum('grand_total');
-
-        // 3. Laba Kotor
         $grossProfit = $totalRevenue - $totalHpp;
-
-        // 4. Beban Operasional (sementara 0)
-        $totalExpenses = 0;
-
-        // 5. Laba Bersih
+        $totalExpenses = Expense::whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
         $netProfit = $grossProfit - $totalExpenses;
 
         return Inertia::render('Reports/ProfitAndLoss', [
@@ -127,7 +92,48 @@ class ReportController extends Controller
                 'gross_profit' => $grossProfit,
                 'total_expenses' => $totalExpenses,
                 'net_profit' => $netProfit,
+            ],
+            'filters' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
             ]
         ]);
+    }
+
+
+
+    public function exportPdf(Request $request)
+    {
+        // Menggunakan logika filter tanggal yang sama persis
+        $startDate = $request->filled('start_date')
+            ? $request->input('start_date')
+            : now()->startOfMonth()->toDateString();
+
+        $endDate = $request->filled('end_date')
+            ? $request->input('end_date')
+            : now()->endOfMonth()->toDateString();
+
+        // Perhitungan data keuangan dari database
+        $totalRevenue = SalesInvoice::whereBetween('invoice_date', [$startDate, $endDate])->sum('grand_total');
+        $totalCogs = PurchaseInvoice::whereBetween('invoice_date', [$startDate, $endDate])->sum('grand_total');
+        $grossProfit = $totalRevenue - $totalCogs;
+        $totalExpense = Expense::whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
+        $netProfit = $grossProfit - $totalExpense;
+
+        // Masukkan ke dalam array data untuk dikirim ke view PDF
+        $data = [
+            'startDate'    => $startDate,
+            'endDate'      => $endDate,
+            'totalRevenue' => $totalRevenue,
+            'totalCogs'    => $totalCogs,
+            'grossProfit'  => $grossProfit,
+            'totalExpense' => $totalExpense,
+            'netProfit'    => $netProfit,
+        ];
+
+        // Load view PDF
+        $pdf = Pdf::loadView('exports.profit-loss-pdf', $data);
+
+        return $pdf->download('laporan-laba-rugi-' . $startDate . '_s_d_' . $endDate . '.pdf');
     }
 }

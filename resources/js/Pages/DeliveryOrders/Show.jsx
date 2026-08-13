@@ -5,16 +5,10 @@ export default function Show({ deliveryOrder }) {
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center w-full">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">
                         Detail Surat Jalan: {deliveryOrder.do_number}
                     </h2>
-                    <Link
-                        href={route('delivery-orders.index')}
-                        className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-600 transition"
-                    >
-                        Kembali
-                    </Link>
                 </div>
             }
         >
@@ -25,7 +19,30 @@ export default function Show({ deliveryOrder }) {
                     
                     {/* Informasi Utama */}
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">Informasi Pengiriman</h3>
+                        <div className="flex justify-between items-center border-b pb-3 mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800">Informasi Pengiriman</h3>
+                            
+                            {/* Tombol Aksi (Delivered & Kembali) di dalam card pojok kanan atas */}
+                            <div className="flex items-center gap-2">
+                                {deliveryOrder.status === 'shipped' && (
+                                    <Link
+                                        href={route('delivery-orders.update-status', deliveryOrder.id)}
+                                        method="patch"
+                                        as="button"
+                                        className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition shadow-sm"
+                                    >
+                                        Tandai Sebagai Delivered
+                                    </Link>
+                                )}
+                                <Link
+                                    href={route('delivery-orders.index')}
+                                    className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-600 transition shadow-sm"
+                                >
+                                    Kembali
+                                </Link>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
                                 <span className="text-gray-500 block">No. Surat Jalan:</span>
@@ -49,7 +66,11 @@ export default function Show({ deliveryOrder }) {
                             </div>
                             <div>
                                 <span className="text-gray-500 block">Status:</span>
-                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    deliveryOrder.status === 'delivered' 
+                                        ? 'bg-blue-100 text-blue-800' 
+                                        : 'bg-green-100 text-green-800'
+                                }`}>
                                     {deliveryOrder.status}
                                 </span>
                             </div>

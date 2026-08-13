@@ -1,6 +1,6 @@
 import React from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, Link } from '@inertiajs/react';
 
 export default function Index({ auth, stockMovements, products, filters }) {
     
@@ -77,17 +77,17 @@ export default function Index({ auth, stockMovements, products, filters }) {
                                                 <td className="px-6 py-4 font-semibold text-gray-900">
                                                     {movement.product?.name || 'Produk Dihapus'}
                                                 </td>
-                                               <td className="px-6 py-4 text-center">
-    {movement.type?.toUpperCase() === 'IN' ? (
-        <span className="px-2.5 py-1 text-xs font-black text-emerald-800 bg-emerald-100 rounded-full">
-            ▲ IN
-        </span>
-    ) : (
-        <span className="px-2.5 py-1 text-xs font-black text-rose-800 bg-rose-100 rounded-full">
-            ▼ OUT
-        </span>
-    )}
-</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {movement.type?.toUpperCase() === 'IN' ? (
+                                                        <span className="px-2.5 py-1 text-xs font-black text-emerald-800 bg-emerald-100 rounded-full">
+                                                            ▲ IN
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2.5 py-1 text-xs font-black text-rose-800 bg-rose-100 rounded-full">
+                                                            ▼ OUT
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4 text-center font-bold text-gray-800">
                                                     {movement.quantity}
                                                 </td>
@@ -106,6 +106,28 @@ export default function Index({ auth, stockMovements, products, filters }) {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination Links - Posisi pojok kanan bawah */}
+{stockMovements.links && stockMovements.links.length > 3 && (
+    <div className="flex justify-end mt-6">
+        <div className="flex flex-wrap gap-1">
+            {stockMovements.links.map((link, index) => (
+                <Link
+                    key={index}
+                    href={link.url || '#'}
+                    className={`px-3 py-1 text-xs rounded border transition ${
+                        link.active
+                            ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                            : link.url
+                            ? 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
+                            : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: link.label }}
+                />
+            ))}
+        </div>
+    </div>
+)}
 
                     </div>
                 </div>

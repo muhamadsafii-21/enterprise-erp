@@ -13,14 +13,28 @@ use Inertia\Inertia;
 
 class DeliveryOrderController extends Controller
 {
-    public function index()
+
+
+    public function index(Request $request)
     {
-        $deliveryOrders = DeliveryOrder::with(['salesOrder.customer', 'items.product'])
-            ->latest()
-            ->paginate(10);
+        $query = DeliveryOrder::with(['salesOrder.customer', 'items.product']);
+
+        // Logika Pencarian berdasarkan No. DO atau Nama Customer
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('do_number', 'like', "%{$search}%")
+                    ->orWhereHas('salesOrder.customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $deliveryOrders = $query->latest()->paginate(10)->withQueryString();
 
         return Inertia::render('DeliveryOrders/Index', [
-            'deliveryOrders' => $deliveryOrders
+            'deliveryOrders' => $deliveryOrders,
+            'filters' => $request->only(['search']), // Kirim nilai pencarian kembali ke frontend
         ]);
     }
 
@@ -103,5 +117,13 @@ class DeliveryOrderController extends Controller
         return Inertia::render('DeliveryOrders/Show', [
             'deliveryOrder' => $deliveryOrder
         ]);
+    }
+    public function updateStatus(Request $request, DeliveryOrder $deliveryOrder)
+    {
+        $deliveryOrder->update([
+            'status' => 'delivered'
+        ]);
+
+        return redirect()->back()->with('success', 'Status pengiriman berhasil diubah menjadi Delivered.');
     }
 }

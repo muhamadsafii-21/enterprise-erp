@@ -29,7 +29,7 @@ export default function Index({ auth, purchaseOrders }) {
                             </div>
                             <Link
                                 href={route('purchase-orders.create')}
-                                style={{ backgroundColor: '#059669', color: '#ffffff' }}
+                                style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}
                                 className="px-4 py-2 font-bold text-sm rounded-md shadow hover:opacity-90 transition cursor-pointer"
                             >
                                 + Tambah PO Baru

@@ -17,4 +17,8 @@ class SalesOrder extends Model
     {
         return $this->hasMany(SalesOrderItem::class);
     }
+    public function salesInvoice()
+    {
+        return $this->hasOne(SalesInvoice::class, 'sales_order_id');
+    }
 }
